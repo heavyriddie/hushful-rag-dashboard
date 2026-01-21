@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hushful RAG Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Hushful RAG Dashboard</h1>
+            <div id="stats" class="stats"></div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab active" data-tab="documents">Documents</button>
+            <button class="tab" data-tab="add">Add Document</button>
+            <button class="tab" data-tab="query">Test Query</button>
+        </nav>
+
+        <!-- Documents Tab -->
+        <section id="documents" class="tab-content active">
+            <div class="toolbar">
+                <input type="text" id="search-filter" placeholder="Filter documents...">
+                <select id="category-filter">
+                    <option value="">All Categories</option>
+                </select>
+                <button onclick="loadDocuments()">Refresh</button>
+            </div>
+            <div id="documents-list" class="documents-list"></div>
+        </section>
+
+        <!-- Add Document Tab -->
+        <section id="add" class="tab-content">
+            <form id="add-form">
+                <div class="form-group">
+                    <label for="doc-content">Content</label>
+                    <textarea id="doc-content" rows="10" required placeholder="Enter document content..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="doc-category">Category</label>
+                        <select id="doc-category">
+                            <option value="dietary_fats">Dietary Fats</option>
+                            <option value="food_mental_health">Food & Mental Health</option>
+                            <option value="keto_diet">Keto Diet</option>
+                            <option value="metabolic_health">Metabolic Health</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="doc-source">Source</label>
+                        <input type="text" id="doc-source" placeholder="e.g., Research paper, blog post">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="doc-source-link">Source Link (optional)</label>
+                    <input type="url" id="doc-source-link" placeholder="https://...">
+                </div>
+                <button type="submit" class="btn-primary">Add Document</button>
+            </form>
+        </section>
+
+        <!-- Query Tab -->
+        <section id="query" class="tab-content">
+            <form id="query-form">
+                <div class="form-group">
+                    <label for="query-text">Query</label>
+                    <input type="text" id="query-text" required placeholder="Enter search query...">
+                </div>
+                <div class="form-group">
+                    <label for="query-results">Number of Results</label>
+                    <input type="number" id="query-results" value="5" min="1" max="20">
+                </div>
+                <button type="submit" class="btn-primary">Search</button>
+            </form>
+            <div id="query-results-list" class="results-list"></div>
+        </section>
+
+        <!-- Edit Modal -->
+        <div id="edit-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h2>Edit Document</h2>
+                <form id="edit-form">
+                    <input type="hidden" id="edit-id">
+                    <div class="form-group">
+                        <label for="edit-content">Content</label>
+                        <textarea id="edit-content" rows="10" required></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-category">Category</label>
+                            <select id="edit-category">
+                                <option value="dietary_fats">Dietary Fats</option>
+                                <option value="food_mental_health">Food & Mental Health</option>
+                                <option value="keto_diet">Keto Diet</option>
+                                <option value="metabolic_health">Metabolic Health</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-source">Source</label>
+                            <input type="text" id="edit-source">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-source-link">Source Link</label>
+                        <input type="url" id="edit-source-link">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Save Changes</button>
+                        <button type="button" class="btn-danger" onclick="deleteDocument()">Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
