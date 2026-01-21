@@ -1,0 +1,18 @@
+# ChromaDB
+chromadb>=0.4.0
+
+# Web framework
+flask>=3.0.0
+
+# Google embeddings (same as main bot)
+langchain-google-genai>=1.0.0
+google-generativeai>=0.3.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# PDF processing (for document uploads)
+pypdf>=3.0.0
+
+# Utilities
+requests>=2.31.0
