@@ -18,13 +18,14 @@ class ChromaManager:
 
     def __init__(self):
         """Initialize ChromaDB Cloud connection."""
-        self.api_key = os.getenv("CHROMA_API_KEY")
-        self.tenant_id = os.getenv("CHROMA_TENANT_ID")
-        self.database = os.getenv("CHROMA_DATABASE", "hushful-testbot")
+        # Support both naming conventions (CHROMA_CLOUD_* from telegram-test, CHROMA_* as fallback)
+        self.api_key = os.getenv("CHROMA_CLOUD_API_KEY") or os.getenv("CHROMA_API_KEY")
+        self.tenant_id = os.getenv("CHROMA_CLOUD_TENANT") or os.getenv("CHROMA_TENANT_ID")
+        self.database = os.getenv("CHROMA_CLOUD_DATABASE") or os.getenv("CHROMA_DATABASE", "hushful-testbot")
         self.collection_name = os.getenv("CHROMA_COLLECTION", "hushful_knowledge")
 
         if not all([self.api_key, self.tenant_id]):
-            raise ValueError("CHROMA_API_KEY and CHROMA_TENANT_ID are required")
+            raise ValueError("CHROMA_CLOUD_API_KEY and CHROMA_CLOUD_TENANT are required")
 
         # Connect to ChromaDB Cloud
         self.client = chromadb.HttpClient(
