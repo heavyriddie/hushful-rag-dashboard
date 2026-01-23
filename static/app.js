@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDocuments();
     setupTabs();
     setupForms();
+    initUploadWorkflow();
 });
 
 // Tab switching
@@ -292,4 +293,364 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// =============================================================================
+// Upload Workflow
+// =============================================================================
+
+// Upload workflow state
+let uploadState = {
+    step: 1,
+    extractedText: '',
+    sourceName: '',
+    sourceUrl: ''
+};
+
+// Initialize upload functionality
+function initUploadWorkflow() {
+    setupDragDrop();
+    setupFileInput();
+    setupUrlFetch();
+    setupSummarize();
+    setupApprove();
+}
+
+// Step navigation
+function goToStep(stepNum) {
+    document.querySelectorAll('.workflow-step').forEach(step => {
+        step.classList.remove('active');
+    });
+    const stepEl = document.getElementById(`upload-step-${stepNum}`);
+    if (stepEl) {
+        stepEl.classList.add('active');
+    }
+    uploadState.step = stepNum;
+}
+
+// Reset workflow
+function resetUploadWorkflow() {
+    uploadState = {
+        step: 1,
+        extractedText: '',
+        sourceName: '',
+        sourceUrl: ''
+    };
+
+    const fileInput = document.getElementById('file-input');
+    if (fileInput) fileInput.value = '';
+
+    const urlInput = document.getElementById('url-input');
+    if (urlInput) urlInput.value = '';
+
+    const extractedText = document.getElementById('extracted-text');
+    if (extractedText) extractedText.value = '';
+
+    const summaryContent = document.getElementById('summary-content');
+    if (summaryContent) summaryContent.value = '';
+
+    const uploadSource = document.getElementById('upload-source');
+    if (uploadSource) uploadSource.value = '';
+
+    const uploadSourceLink = document.getElementById('upload-source-link');
+    if (uploadSourceLink) uploadSourceLink.value = '';
+
+    clearStatus('upload-status');
+    clearStatus('summarize-status');
+    clearStatus('approve-status');
+    goToStep(1);
+}
+
+// Switch to documents tab
+function viewDocuments() {
+    document.querySelector('[data-tab="documents"]').click();
+    loadDocuments();
+}
+
+// Drag and drop setup
+function setupDragDrop() {
+    const dropZone = document.getElementById('drop-zone');
+    if (!dropZone) return;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.add('drag-over');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.remove('drag-over');
+        });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFileUpload(files[0]);
+        }
+    });
+}
+
+// File input setup
+function setupFileInput() {
+    const fileInput = document.getElementById('file-input');
+    if (!fileInput) return;
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFileUpload(e.target.files[0]);
+        }
+    });
+}
+
+// Handle file upload
+async function handleFileUpload(file) {
+    const statusEl = document.getElementById('upload-status');
+    showStatus(statusEl, 'loading', `Extracting text from ${file.name}...`);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            uploadState.extractedText = data.text;
+            uploadState.sourceName = data.filename;
+            uploadState.sourceUrl = '';
+
+            showExtractionResults(data);
+            clearStatus(statusEl);
+            goToStep(2);
+        } else {
+            showStatus(statusEl, 'error', data.error);
+        }
+    } catch (err) {
+        showStatus(statusEl, 'error', 'Failed to upload file');
+        console.error(err);
+    }
+}
+
+// URL fetch setup
+function setupUrlFetch() {
+    const fetchBtn = document.getElementById('fetch-url-btn');
+    if (!fetchBtn) return;
+
+    fetchBtn.addEventListener('click', handleUrlFetch);
+
+    // Also allow Enter key in URL input
+    const urlInput = document.getElementById('url-input');
+    if (urlInput) {
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleUrlFetch();
+            }
+        });
+    }
+}
+
+// Handle URL fetch
+async function handleUrlFetch() {
+    const urlInput = document.getElementById('url-input');
+    const url = urlInput ? urlInput.value.trim() : '';
+
+    if (!url) {
+        showStatus(document.getElementById('upload-status'), 'error',
+                   'Please enter a URL');
+        return;
+    }
+
+    const statusEl = document.getElementById('upload-status');
+    showStatus(statusEl, 'loading', 'Fetching content from URL...');
+
+    try {
+        const response = await fetch('/api/extract-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            uploadState.extractedText = data.text;
+            uploadState.sourceName = data.title || url;
+            uploadState.sourceUrl = data.url;
+
+            showExtractionResults(data);
+            clearStatus(statusEl);
+            goToStep(2);
+        } else {
+            showStatus(statusEl, 'error', data.error);
+        }
+    } catch (err) {
+        showStatus(statusEl, 'error', 'Failed to fetch URL');
+        console.error(err);
+    }
+}
+
+// Show extraction results
+function showExtractionResults(data) {
+    const sourceEl = document.getElementById('extraction-source');
+    if (sourceEl) {
+        sourceEl.textContent = `Source: ${data.filename || data.title || data.url}`;
+    }
+
+    const statsEl = document.getElementById('extraction-stats');
+    if (statsEl) {
+        statsEl.textContent = `${data.word_count.toLocaleString()} words | ${data.char_count.toLocaleString()} characters`;
+    }
+
+    // Show preview (first 5000 chars)
+    const preview = data.text.length > 5000
+        ? data.text.substring(0, 5000) + '\n\n... [truncated for preview]'
+        : data.text;
+
+    const extractedTextEl = document.getElementById('extracted-text');
+    if (extractedTextEl) {
+        extractedTextEl.value = preview;
+    }
+
+    // Pre-fill source fields
+    const uploadSourceEl = document.getElementById('upload-source');
+    if (uploadSourceEl) {
+        uploadSourceEl.value = uploadState.sourceName;
+    }
+
+    const uploadSourceLinkEl = document.getElementById('upload-source-link');
+    if (uploadSourceLinkEl) {
+        uploadSourceLinkEl.value = uploadState.sourceUrl;
+    }
+}
+
+// Summarize setup
+function setupSummarize() {
+    const summarizeBtn = document.getElementById('summarize-btn');
+    if (!summarizeBtn) return;
+
+    summarizeBtn.addEventListener('click', handleSummarize);
+}
+
+// Handle summarization
+async function handleSummarize() {
+    const statusEl = document.getElementById('summarize-status');
+    showStatus(statusEl, 'loading',
+               'Generating summary with Claude... This may take a moment.');
+
+    try {
+        const response = await fetch('/api/summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: uploadState.extractedText,
+                source_name: uploadState.sourceName
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            const summaryContent = document.getElementById('summary-content');
+            if (summaryContent) {
+                summaryContent.value = data.summary;
+            }
+            clearStatus(statusEl);
+            goToStep(3);
+        } else {
+            showStatus(statusEl, 'error', data.error);
+        }
+    } catch (err) {
+        showStatus(statusEl, 'error', 'Failed to generate summary');
+        console.error(err);
+    }
+}
+
+// Approve setup
+function setupApprove() {
+    const approveBtn = document.getElementById('approve-btn');
+    if (!approveBtn) return;
+
+    approveBtn.addEventListener('click', handleApprove);
+}
+
+// Handle approval - add to knowledge base
+async function handleApprove() {
+    const summaryContentEl = document.getElementById('summary-content');
+    const content = summaryContentEl ? summaryContentEl.value.trim() : '';
+
+    if (!content) {
+        showStatus(document.getElementById('approve-status'), 'error',
+                   'Summary content is required');
+        return;
+    }
+
+    const statusEl = document.getElementById('approve-status');
+    showStatus(statusEl, 'loading', 'Adding to knowledge base...');
+
+    const categoryEl = document.getElementById('upload-category');
+    const sourceEl = document.getElementById('upload-source');
+    const sourceLinkEl = document.getElementById('upload-source-link');
+
+    const metadata = {
+        category: categoryEl ? categoryEl.value : 'other',
+        source: sourceEl && sourceEl.value ? sourceEl.value : undefined,
+        source_link: sourceLinkEl && sourceLinkEl.value ? sourceLinkEl.value : undefined
+    };
+
+    try {
+        const response = await fetch('/api/documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content, metadata })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            const docIdEl = document.getElementById('added-doc-id');
+            if (docIdEl) {
+                docIdEl.textContent = `Document ID: ${data.id}`;
+            }
+            loadStats();
+            clearStatus(statusEl);
+            goToStep(4);
+        } else {
+            showStatus(statusEl, 'error', data.error);
+        }
+    } catch (err) {
+        showStatus(statusEl, 'error', 'Failed to add document');
+        console.error(err);
+    }
+}
+
+// Status helpers
+function showStatus(element, type, message) {
+    if (!element) return;
+    element.className = `status-message ${type}`;
+    element.textContent = message;
+}
+
+function clearStatus(elementId) {
+    const element = typeof elementId === 'string'
+        ? document.getElementById(elementId)
+        : elementId;
+    if (!element) return;
+    element.className = 'status-message';
+    element.textContent = '';
 }

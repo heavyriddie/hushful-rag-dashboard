@@ -11,8 +11,19 @@ google-generativeai>=0.3.0
 # Environment variables
 python-dotenv>=1.0.0
 
-# PDF processing (for document uploads)
+# Document processing
 pypdf>=3.0.0
+python-docx>=1.0.0
+ebooklib>=0.18
+beautifulsoup4>=4.12.0
+html2text>=2020.1.16
+lxml>=5.0.0
+
+# AI summarization
+anthropic>=0.40.0
 
 # Utilities
 requests>=2.31.0
+
+# Production server
+gunicorn>=21.0.0

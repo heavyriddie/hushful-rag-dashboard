@@ -15,7 +15,8 @@
 
         <nav class="tabs">
             <button class="tab active" data-tab="documents">Documents</button>
-            <button class="tab" data-tab="add">Add Document</button>
+            <button class="tab" data-tab="upload">Upload</button>
+            <button class="tab" data-tab="add">Add Manual</button>
             <button class="tab" data-tab="query">Test Query</button>
         </nav>
 
@@ -29,6 +30,135 @@
                 <button onclick="loadDocuments()">Refresh</button>
             </div>
             <div id="documents-list" class="documents-list"></div>
+        </section>
+
+        <!-- Upload Tab -->
+        <section id="upload" class="tab-content">
+            <div class="upload-workflow">
+                <!-- Step 1: Upload -->
+                <div id="upload-step-1" class="workflow-step active">
+                    <h3>Step 1: Upload Document or Enter URL</h3>
+
+                    <div class="upload-options">
+                        <!-- File Upload -->
+                        <div class="upload-zone" id="drop-zone">
+                            <div class="upload-icon">📄</div>
+                            <p>Drag & drop a file here</p>
+                            <p class="subtext">or</p>
+                            <label class="file-input-label">
+                                Choose File
+                                <input type="file" id="file-input"
+                                       accept=".pdf,.docx,.epub,.txt,.md" hidden>
+                            </label>
+                            <p class="formats">Supported: PDF, DOCX, EPUB, TXT, MD</p>
+                        </div>
+
+                        <div class="upload-divider">
+                            <span>OR</span>
+                        </div>
+
+                        <!-- URL Input -->
+                        <div class="url-input-section">
+                            <label for="url-input">Enter URL</label>
+                            <div class="url-input-row">
+                                <input type="url" id="url-input"
+                                       placeholder="https://example.com/article">
+                                <button type="button" id="fetch-url-btn"
+                                        class="btn-primary">Fetch</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="upload-status" class="status-message"></div>
+                </div>
+
+                <!-- Step 2: Review Extracted Text & Summarize -->
+                <div id="upload-step-2" class="workflow-step">
+                    <h3>Step 2: Review Extracted Content</h3>
+
+                    <div class="extraction-info">
+                        <span id="extraction-source"></span>
+                        <span id="extraction-stats"></span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Extracted Text (preview)</label>
+                        <textarea id="extracted-text" rows="8" readonly></textarea>
+                    </div>
+
+                    <div class="step-actions">
+                        <button type="button" class="btn-secondary"
+                                onclick="goToStep(1)">Back</button>
+                        <button type="button" class="btn-primary"
+                                id="summarize-btn">Generate Summary</button>
+                    </div>
+
+                    <div id="summarize-status" class="status-message"></div>
+                </div>
+
+                <!-- Step 3: Review & Edit Summary -->
+                <div id="upload-step-3" class="workflow-step">
+                    <h3>Step 3: Review & Edit Summary</h3>
+                    <p class="step-description">
+                        Review the AI-generated summary below.
+                        You may edit it before adding to the knowledge base.
+                    </p>
+
+                    <div class="form-group">
+                        <label for="summary-content">Summary</label>
+                        <textarea id="summary-content" rows="10"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="upload-category">Category</label>
+                            <select id="upload-category">
+                                <option value="dietary_fats">Dietary Fats</option>
+                                <option value="food_mental_health">Food & Mental Health</option>
+                                <option value="keto_diet">Keto Diet</option>
+                                <option value="metabolic_health">Metabolic Health</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="upload-source">Source Name</label>
+                            <input type="text" id="upload-source"
+                                   placeholder="e.g., Research paper title">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="upload-source-link">Source Link</label>
+                        <input type="url" id="upload-source-link"
+                               placeholder="https://...">
+                    </div>
+
+                    <div class="step-actions">
+                        <button type="button" class="btn-secondary"
+                                onclick="goToStep(2)">Back</button>
+                        <button type="button" class="btn-primary"
+                                id="approve-btn">Approve & Add to Knowledge Base</button>
+                    </div>
+
+                    <div id="approve-status" class="status-message"></div>
+                </div>
+
+                <!-- Step 4: Success -->
+                <div id="upload-step-4" class="workflow-step">
+                    <h3>Document Added Successfully!</h3>
+                    <div class="success-message">
+                        <div class="success-icon">✓</div>
+                        <p>The document has been added to the knowledge base.</p>
+                        <p id="added-doc-id"></p>
+                    </div>
+                    <div class="step-actions">
+                        <button type="button" class="btn-primary"
+                                onclick="resetUploadWorkflow()">Upload Another</button>
+                        <button type="button" class="btn-secondary"
+                                onclick="viewDocuments()">View Documents</button>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- Add Document Tab -->
