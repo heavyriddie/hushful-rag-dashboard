@@ -703,13 +703,22 @@ function initDialogue() {
 
 // Load KB stats into dialogue sidebar
 async function loadDialogueStats() {
+    const statsEl = document.getElementById('dialogue-kb-stats');
+    const catList = document.getElementById('dialogue-categories');
+
     try {
         const res = await fetch('/api/stats');
+        if (!res.ok) {
+            if (statsEl) statsEl.innerHTML = '<div class="stat-row"><span>Connection error</span></div>';
+            return;
+        }
         const data = await res.json();
-        if (!data.success) return;
+        if (!data.success) {
+            if (statsEl) statsEl.innerHTML = '<div class="stat-row"><span>Could not load stats</span></div>';
+            return;
+        }
 
         const stats = data.stats;
-        const statsEl = document.getElementById('dialogue-kb-stats');
         if (statsEl) {
             statsEl.innerHTML = `
                 <div class="stat-row"><span>Documents</span><span>${stats.total_documents}</span></div>
@@ -717,7 +726,6 @@ async function loadDialogueStats() {
             `;
         }
 
-        const catList = document.getElementById('dialogue-categories');
         if (catList) {
             catList.innerHTML = Object.entries(stats.categories)
                 .sort((a, b) => b[1] - a[1])
@@ -726,6 +734,7 @@ async function loadDialogueStats() {
         }
     } catch (err) {
         console.error('Error loading dialogue stats:', err);
+        if (statsEl) statsEl.innerHTML = '<div class="stat-row"><span>Failed to connect</span></div>';
     }
 }
 
