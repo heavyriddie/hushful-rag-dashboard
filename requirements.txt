@@ -4,9 +4,8 @@ chromadb>=0.4.0
 # Web framework
 flask>=3.0.0
 
-# Google embeddings (same as main bot)
-langchain-google-genai>=1.0.0
-google-generativeai>=0.3.0
+# Google embeddings (same as main bot - uses new google-genai SDK)
+google-genai>=1.0.0
 
 # Environment variables
 python-dotenv>=1.0.0

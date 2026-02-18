@@ -2,6 +2,16 @@
 let allDocuments = [];
 let currentEditId = null;
 
+// Dialogue state
+let dialogueState = {
+    chatHistory: [],
+    consensusPoints: [],
+    currentTopic: '',
+    currentCategory: '',
+    generatedArticle: '',
+    topicStarted: false
+};
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadStats();
@@ -9,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTabs();
     setupForms();
     initUploadWorkflow();
+    initDialogue();
 });
 
 // Tab switching
@@ -653,4 +664,399 @@ function clearStatus(elementId) {
     if (!element) return;
     element.className = 'status-message';
     element.textContent = '';
+}
+
+// =============================================================================
+// Expert Dialogue
+// =============================================================================
+
+function initDialogue() {
+    const sendBtn = document.getElementById('dialogue-send');
+    const input = document.getElementById('dialogue-input');
+    const startBtn = document.getElementById('start-topic-btn');
+    const generateBtn = document.getElementById('generate-article-btn');
+    const commitBtn = document.getElementById('commit-article-btn');
+
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendDialogueMessage);
+    }
+    if (input) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendDialogueMessage();
+            }
+        });
+    }
+    if (startBtn) {
+        startBtn.addEventListener('click', startNewTopic);
+    }
+    if (generateBtn) {
+        generateBtn.addEventListener('click', generateArticle);
+    }
+    if (commitBtn) {
+        commitBtn.addEventListener('click', commitArticle);
+    }
+
+    loadDialogueStats();
+}
+
+// Load KB stats into dialogue sidebar
+async function loadDialogueStats() {
+    try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const stats = data.stats;
+        const statsEl = document.getElementById('dialogue-kb-stats');
+        if (statsEl) {
+            statsEl.innerHTML = `
+                <div class="stat-row"><span>Documents</span><span>${stats.total_documents}</span></div>
+                <div class="stat-row"><span>Categories</span><span>${Object.keys(stats.categories).length}</span></div>
+            `;
+        }
+
+        const catList = document.getElementById('dialogue-categories');
+        if (catList) {
+            catList.innerHTML = Object.entries(stats.categories)
+                .sort((a, b) => b[1] - a[1])
+                .map(([cat, count]) => `<li>${cat} (${count})</li>`)
+                .join('');
+        }
+    } catch (err) {
+        console.error('Error loading dialogue stats:', err);
+    }
+}
+
+// Start a new topic
+function startNewTopic() {
+    const topicInput = document.getElementById('dialogue-topic');
+    const categorySelect = document.getElementById('dialogue-category');
+
+    const topic = topicInput ? topicInput.value.trim() : '';
+    const category = categorySelect ? categorySelect.value : 'other';
+
+    if (!topic) {
+        alert('Please enter a topic for discussion.');
+        return;
+    }
+
+    // Reset state
+    dialogueState = {
+        chatHistory: [],
+        consensusPoints: [],
+        currentTopic: topic,
+        currentCategory: category,
+        generatedArticle: '',
+        topicStarted: true
+    };
+
+    // Update UI
+    const header = document.getElementById('chat-topic-header');
+    if (header) header.textContent = topic;
+
+    const messagesEl = document.getElementById('chat-messages');
+    if (messagesEl) messagesEl.innerHTML = '';
+
+    renderConsensusPoints();
+    hideArticleSection();
+
+    // Enable input
+    const input = document.getElementById('dialogue-input');
+    const sendBtn = document.getElementById('dialogue-send');
+    if (input) { input.disabled = false; input.focus(); }
+    if (sendBtn) sendBtn.disabled = false;
+
+    // Add system message
+    addSystemMessage(`Topic: "${topic}" (${category}). Share your first knowledge claim with supporting evidence.`);
+}
+
+// Send a dialogue message
+async function sendDialogueMessage() {
+    const input = document.getElementById('dialogue-input');
+    const sendBtn = document.getElementById('dialogue-send');
+    if (!input || !dialogueState.topicStarted) return;
+
+    const message = input.value.trim();
+    if (!message) return;
+
+    // Add user message
+    addUserMessage(message);
+    dialogueState.chatHistory.push({ role: 'user', content: message });
+    input.value = '';
+    input.disabled = true;
+    if (sendBtn) sendBtn.disabled = true;
+
+    // Show typing indicator
+    const typingEl = addTypingIndicator();
+
+    try {
+        const res = await fetch('/api/dialogue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: dialogueState.chatHistory,
+                new_message: message,
+                topic: dialogueState.currentTopic,
+                category: dialogueState.currentCategory,
+                consensus_points: dialogueState.consensusPoints
+                    .filter(p => p.confirmed)
+                    .map(p => p.claim)
+            })
+        });
+
+        const data = await res.json();
+
+        // Remove typing indicator
+        if (typingEl) typingEl.remove();
+
+        if (data.success) {
+            addAssistantMessage(data.reply);
+            dialogueState.chatHistory.push({ role: 'assistant', content: data.reply });
+
+            // Check for new consensus point
+            if (data.consensus_point) {
+                addConsensusPoint(data.consensus_point);
+            }
+        } else {
+            addSystemMessage('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (err) {
+        if (typingEl) typingEl.remove();
+        addSystemMessage('Network error. Please try again.');
+        console.error('Dialogue error:', err);
+    }
+
+    input.disabled = false;
+    if (sendBtn) sendBtn.disabled = false;
+    input.focus();
+}
+
+// Message rendering helpers
+function addUserMessage(text) {
+    const messagesEl = document.getElementById('chat-messages');
+    if (!messagesEl) return;
+
+    const div = document.createElement('div');
+    div.className = 'chat-message user';
+    div.innerHTML = `
+        <div class="avatar">E</div>
+        <div class="bubble">${formatMessage(text)}</div>
+    `;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addAssistantMessage(text) {
+    const messagesEl = document.getElementById('chat-messages');
+    if (!messagesEl) return;
+
+    const div = document.createElement('div');
+    div.className = 'chat-message assistant';
+    div.innerHTML = `
+        <div class="avatar">S</div>
+        <div class="bubble">${formatMessage(text)}</div>
+    `;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addSystemMessage(text) {
+    const messagesEl = document.getElementById('chat-messages');
+    if (!messagesEl) return;
+
+    const div = document.createElement('div');
+    div.style.cssText = 'text-align:center;color:#999;font-size:13px;padding:8px;font-style:italic;';
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addTypingIndicator() {
+    const messagesEl = document.getElementById('chat-messages');
+    if (!messagesEl) return null;
+
+    const div = document.createElement('div');
+    div.className = 'chat-typing';
+    div.textContent = 'Socratic reviewer is thinking...';
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+}
+
+function formatMessage(text) {
+    // Simple markdown: **bold**, *italic*, newlines
+    return escapeHtml(text)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
+}
+
+// Consensus point management
+function addConsensusPoint(point) {
+    dialogueState.consensusPoints.push({
+        claim: point.claim || point,
+        evidence_level: point.evidence_level || 'unknown',
+        citations: point.sources || point.citations || '',
+        confirmed: false
+    });
+    renderConsensusPoints();
+    addSystemMessage('New consensus point proposed. Review it in the right panel.');
+}
+
+function confirmConsensusPoint(index) {
+    if (dialogueState.consensusPoints[index]) {
+        dialogueState.consensusPoints[index].confirmed = true;
+        renderConsensusPoints();
+        updateGenerateButton();
+    }
+}
+
+function rejectConsensusPoint(index) {
+    dialogueState.consensusPoints.splice(index, 1);
+    renderConsensusPoints();
+    updateGenerateButton();
+}
+
+function renderConsensusPoints() {
+    const container = document.getElementById('consensus-points');
+    if (!container) return;
+
+    if (dialogueState.consensusPoints.length === 0) {
+        container.innerHTML = '<div class="consensus-empty">No consensus points yet. Discuss knowledge claims to build consensus.</div>';
+        return;
+    }
+
+    container.innerHTML = dialogueState.consensusPoints.map((point, i) => `
+        <div class="consensus-point ${point.confirmed ? 'confirmed' : ''}">
+            <div class="claim">${escapeHtml(point.claim)}</div>
+            <div class="evidence">Evidence: ${escapeHtml(point.evidence_level)}</div>
+            ${point.citations ? `<div class="citations">${escapeHtml(point.citations)}</div>` : ''}
+            <div class="point-actions">
+                <button class="btn-confirm" onclick="confirmConsensusPoint(${i})">Confirm</button>
+                <button class="btn-reject" onclick="rejectConsensusPoint(${i})">Remove</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateGenerateButton() {
+    const btn = document.getElementById('generate-article-btn');
+    if (!btn) return;
+    const confirmedCount = dialogueState.consensusPoints.filter(p => p.confirmed).length;
+    btn.disabled = confirmedCount === 0;
+}
+
+// Article generation
+async function generateArticle() {
+    const btn = document.getElementById('generate-article-btn');
+    if (btn) btn.disabled = true;
+
+    const confirmed = dialogueState.consensusPoints.filter(p => p.confirmed);
+    if (confirmed.length === 0) {
+        alert('Confirm at least one consensus point first.');
+        if (btn) btn.disabled = false;
+        return;
+    }
+
+    addSystemMessage('Generating article from confirmed consensus points...');
+
+    try {
+        const res = await fetch('/api/generate-article', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                topic: dialogueState.currentTopic,
+                category: dialogueState.currentCategory,
+                consensus_points: confirmed.map(p => ({
+                    claim: p.claim,
+                    evidence_level: p.evidence_level,
+                    citations: p.citations
+                }))
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            dialogueState.generatedArticle = data.article;
+            showArticlePreview(data.article);
+            addSystemMessage('Article generated. Review in the right panel, then commit to the knowledge base.');
+        } else {
+            addSystemMessage('Error generating article: ' + (data.error || 'Unknown'));
+        }
+    } catch (err) {
+        addSystemMessage('Network error generating article.');
+        console.error(err);
+    }
+
+    if (btn) btn.disabled = false;
+}
+
+function showArticlePreview(article) {
+    const section = document.getElementById('article-section');
+    const content = document.getElementById('article-preview');
+    const commitBtn = document.getElementById('commit-article-btn');
+
+    if (section) section.classList.add('visible');
+    if (content) content.textContent = article;
+    if (commitBtn) commitBtn.disabled = false;
+}
+
+function hideArticleSection() {
+    const section = document.getElementById('article-section');
+    const commitBtn = document.getElementById('commit-article-btn');
+    if (section) section.classList.remove('visible');
+    if (commitBtn) commitBtn.disabled = true;
+}
+
+// Commit article to knowledge base
+async function commitArticle() {
+    if (!dialogueState.generatedArticle) {
+        alert('Generate an article first.');
+        return;
+    }
+
+    const commitBtn = document.getElementById('commit-article-btn');
+    if (commitBtn) commitBtn.disabled = true;
+
+    const confirmed = dialogueState.consensusPoints.filter(p => p.confirmed);
+    const citations = confirmed.map(p => p.citations).filter(Boolean).join('; ');
+
+    const metadata = {
+        title: dialogueState.currentTopic,
+        category: dialogueState.currentCategory,
+        source: 'knowledge_editor',
+        expert_id: 'expert',
+        sources: citations,
+        consensus_date: new Date().toISOString(),
+        verification_status: 'expert_verified',
+        consensus_points_count: confirmed.length
+    };
+
+    try {
+        const res = await fetch('/api/documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: dialogueState.generatedArticle,
+                metadata
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            addSystemMessage(`Article committed to knowledge base (ID: ${data.id}). It is now searchable by the bot and pinboard.`);
+            loadStats();
+            loadDialogueStats();
+            hideArticleSection();
+        } else {
+            addSystemMessage('Error committing: ' + (data.error || 'Unknown'));
+            if (commitBtn) commitBtn.disabled = false;
+        }
+    } catch (err) {
+        addSystemMessage('Network error committing article.');
+        if (commitBtn) commitBtn.disabled = false;
+        console.error(err);
+    }
 }
