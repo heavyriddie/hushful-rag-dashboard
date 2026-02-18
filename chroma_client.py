@@ -11,7 +11,6 @@ from typing import Optional, List, Dict, Any
 import uuid
 
 import chromadb
-from chromadb.config import Settings
 import google.genai as genai
 
 logger = logging.getLogger(__name__)
@@ -40,14 +39,11 @@ class ChromaManager:
             raise ValueError("GOOGLE_API_KEY is required for embeddings")
         self.genai_client = genai.Client(api_key=google_api_key)
 
-        # Connect to ChromaDB Cloud
-        self.client = chromadb.HttpClient(
-            host="api.trychroma.com",
-            port=443,
-            ssl=True,
-            headers={"Authorization": f"Bearer {self.api_key}"},
+        # Connect to ChromaDB Cloud (use CloudClient like the bot's KnowledgeService)
+        self.client = chromadb.CloudClient(
             tenant=self.tenant_id,
-            database=self.database
+            database=self.database,
+            api_key=self.api_key
         )
 
         # Get or create collection
