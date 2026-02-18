@@ -62,7 +62,7 @@ class ChromaManager:
         )
         return result.embeddings[0].values
 
-    def list_documents(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+    def list_documents(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         """List all documents in the collection."""
         result = self.collection.get(
             limit=limit,
@@ -173,15 +173,21 @@ class ChromaManager:
         return formatted
 
     def get_stats(self) -> Dict[str, Any]:
-        """Get collection statistics."""
+        """Get collection statistics (stays within free tier quota)."""
         count = self.collection.count()
 
-        # Get category counts
-        all_docs = self.list_documents(limit=1000)
+        # Get category counts — use small limit to stay within Chroma Cloud quota
         categories = {}
-        for doc in all_docs:
-            cat = doc["metadata"].get("category", "uncategorized")
-            categories[cat] = categories.get(cat, 0) + 1
+        try:
+            result = self.collection.get(
+                limit=min(count, 100),
+                include=["metadatas"]
+            )
+            for meta in (result["metadatas"] or []):
+                cat = meta.get("category", "uncategorized") if meta else "uncategorized"
+                categories[cat] = categories.get(cat, 0) + 1
+        except Exception as e:
+            logger.warning(f"Could not fetch categories: {e}")
 
         return {
             "total_documents": count,
