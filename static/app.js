@@ -922,10 +922,28 @@ function confirmConsensusPoint(index) {
     }
 }
 
+function unconfirmConsensusPoint(index) {
+    if (dialogueState.consensusPoints[index]) {
+        dialogueState.consensusPoints[index].confirmed = false;
+        renderConsensusPoints();
+        updateGenerateButton();
+    }
+}
+
 function rejectConsensusPoint(index) {
     dialogueState.consensusPoints.splice(index, 1);
     renderConsensusPoints();
     updateGenerateButton();
+}
+
+function editConsensusPoint(index) {
+    const point = dialogueState.consensusPoints[index];
+    if (!point) return;
+    const newClaim = prompt('Edit consensus point:', point.claim);
+    if (newClaim !== null && newClaim.trim()) {
+        point.claim = newClaim.trim();
+        renderConsensusPoints();
+    }
 }
 
 function renderConsensusPoints() {
@@ -943,7 +961,11 @@ function renderConsensusPoints() {
             <div class="evidence">Evidence: ${escapeHtml(point.evidence_level)}</div>
             ${point.citations ? `<div class="citations">${escapeHtml(point.citations)}</div>` : ''}
             <div class="point-actions">
-                <button class="btn-confirm" onclick="confirmConsensusPoint(${i})">Confirm</button>
+                ${point.confirmed
+                    ? `<button class="btn-unconfirm" onclick="unconfirmConsensusPoint(${i})">Unconfirm</button>`
+                    : `<button class="btn-confirm" onclick="confirmConsensusPoint(${i})">Confirm</button>`
+                }
+                <button class="btn-edit" onclick="editConsensusPoint(${i})">Edit</button>
                 <button class="btn-reject" onclick="rejectConsensusPoint(${i})">Remove</button>
             </div>
         </div>

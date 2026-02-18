@@ -833,19 +833,22 @@ textarea[readonly] {
     background: #f1f8e9;
 }
 
-.consensus-point.confirmed .point-actions {
-    display: none;
+.btn-unconfirm {
+    background: #fff3e0;
+    color: #e65100;
 }
 
-.consensus-point.confirmed::after {
-    content: 'Confirmed';
-    display: inline-block;
-    font-size: 10px;
-    color: #2d5a27;
-    background: #e8f5e9;
-    padding: 1px 6px;
-    border-radius: 3px;
-    margin-top: 4px;
+.btn-unconfirm:hover {
+    background: #ffe0b2;
+}
+
+.btn-edit {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.btn-edit:hover {
+    background: #bbdefb;
 }
 
 /* Article preview */
@@ -903,7 +906,8 @@ textarea[readonly] {
 }
 
 .btn-generate:disabled {
-    background: #90caf9;
+    background: #ccc;
+    color: #888;
     cursor: not-allowed;
 }
 
@@ -917,7 +921,8 @@ textarea[readonly] {
 }
 
 .btn-commit:disabled {
-    background: #a5d6a7;
+    background: #ccc;
+    color: #888;
     cursor: not-allowed;
 }
 
