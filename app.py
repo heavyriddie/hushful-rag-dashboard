@@ -33,10 +33,14 @@ dialogue_service = None
 
 
 def get_chroma():
-    """Get or create ChromaDB manager."""
+    """Get or create ChromaDB manager (retries on failure)."""
     global chroma_manager
     if chroma_manager is None:
-        chroma_manager = ChromaManager()
+        try:
+            chroma_manager = ChromaManager()
+        except Exception as e:
+            logger.error(f"ChromaDB connection failed: {e}")
+            raise
     return chroma_manager
 
 
@@ -61,6 +65,33 @@ def get_dialogue():
 # =============================================================================
 
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "hushful-admin-2026")
+
+
+@app.route("/health")
+def health():
+    """Health check with env var diagnostics (no auth required)."""
+    env_keys = [
+        "GOOGLE_API_KEY", "CHROMA_CLOUD_API_KEY", "CHROMA_CLOUD_TENANT",
+        "CHROMA_CLOUD_DATABASE", "ANTHROPIC_API_KEY", "DASHBOARD_PASSWORD",
+        "FLASK_SECRET_KEY"
+    ]
+    env_status = {k: ("set" if os.getenv(k) else "MISSING") for k in env_keys}
+
+    chroma_ok = False
+    chroma_error = None
+    try:
+        cm = get_chroma()
+        count = cm.collection.count()
+        chroma_ok = True
+        chroma_error = f"connected, {count} docs"
+    except Exception as e:
+        chroma_error = str(e)
+
+    return jsonify({
+        "status": "ok" if chroma_ok else "degraded",
+        "chroma": chroma_error,
+        "env": env_status
+    })
 
 
 def auth_required(f):
